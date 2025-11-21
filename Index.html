@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Drag & Drop</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            min-height: 100vh;
+            padding: 10px;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 100%;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 10px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            flex-shrink: 0;
+        }
+
+        h1 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .subtitle {
+            font-size: 1em;
+            opacity: 0.9;
+        }
+
+        .user-info {
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            display: inline-block;
+            font-size: 0.9em;
+        }
+
+        .workspace {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .sidebar {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            color: #333;
+        }
+
+        .user-list {
+            list-style: none;
+            margin-top: 15px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .user-item {
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            display: flex;
+            align-items: center;
+            font-size: 0.9em;
+        }
+
+        .user-color {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .controls {
+            margin-top: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin: 6px 0;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .main-area {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            position: relative;
+            min-height: 400px;
+            flex-shrink: 0;
+        }
+
+        .canvas {
+            width: 100%;
+            height: 400px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #dee2e6;
+        }
+
+        .draggable {
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: move;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: box-shadow 0.3s;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            user-select: none;
+            touch-action: none;
+            font-size: 1.2em;
+        }
+
+        .draggable:active {
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+            transform: scale(1.05);
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            border-radius: 15px;
+            font-weight: bold;
+            z-index: 1000;
+            font-size: 0.8em;
+            background: #28a745;
+            color: white;
+        }
+
+        .instructions {
+            margin-top: 15px;
+            padding: 12px;
+            background: #e9ecef;
+            border-radius: 8px;
+            font-size: 0.8em;
+        }
+
+        /* Mobile optimizations */
+        @media (min-width: 768px) {
+            .workspace {
+                flex-direction: row;
+                height: 70vh;
+            }
+            
+            .sidebar {
+                width: 300px;
+                flex-shrink: 0;
+            }
+            
+            .main-area {
+                flex: 1;
+                min-height: auto;
+            }
+            
+            .canvas {
+                height: 100%;
+            }
+        }
+
+        @media (max-height: 700px) {
+            .canvas {
+                height: 350px;
+            }
+        }
+
+        @media (max-height: 600px) {
+            .canvas {
+                height: 300px;
+            }
+        }
+
+        /* Ensure proper scrolling on very small screens */
+        @media (max-height: 500px) {
+            body {
+                overflow-y: auto;
+            }
+            
+            .container {
+                min-height: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Multiplayer Drag & Drop</h1>
+            <p class="subtitle">Drag objects around the canvas</p>
+            <div class="user-info">
+                Your Color: <span id="userColorDisplay">Loading...</span> | 
+                Users Online: <span id="userCount">1</span>
+            </div>
+        </header>
+
+        <div class="connection-status">Ready</div>
+
+        <div class="workspace">
+            <div class="sidebar">
+                <h3>Online Users</h3>
+                <ul class="user-list" id="userList">
+                    <li class="user-item">Just you for now - share the link!</li>
+                </ul>
+
+                <div class="controls">
+                    <h3>Controls</h3>
+                    <button id="addObjectBtn">➕ Add Object</button>
+                    <button id="clearAllBtn">🗑️ Clear Objects</button>
+                    <button id="changeColorBtn">🎨 Change Color</button>
+                </div>
+
+                <div class="instructions">
+                    <h4>How to Use:</h4>
+                    <p>• Drag colored objects around</p>
+                    <p>• Add more objects with the button</p>
+                    <p>• Share the link for multiplayer</p>
+                    <p>• Objects save automatically</p>
+                </div>
+            </div>
+
+            <div class="main-area">
+                <div class="canvas" id="canvas">
+                    <!-- Draggable objects will be added here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple local storage for demo
+        class LocalMultiplayer {
+            constructor() {
+                this.localUser = null;
+                this.objects = {};
+                this.init();
+            }
+
+            init() {
+                this.localUser = {
+                    id: 'user_' + Math.random().toString(36).substr(2, 9),
+                    name: 'You',
+                    color: this.generateRandomColor()
+                };
+
+                // Load objects from localStorage
+                this.loadObjects();
+                
+                // Initialize display
+                this.updateUserDisplay();
+                this.renderObjects();
+            }
+
+            generateRandomColor() {
+                const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+
+            addObject(x, y) {
+                const objectId = 'obj_' + Math.random().toString(36).substr(2, 9);
+                this.objects[objectId] = {
+                    id: objectId,
+                    x: x,
+                    y: y,
+                    color: this.generateRandomColor(),
+                    text: String(Object.keys(this.objects).length + 1)
+                };
+                
+                this.saveObjects();
+                this.renderObjects();
+                return objectId;
+            }
+
+            updateObjectPosition(objectId, x, y) {
+                if (this.objects[objectId]) {
+                    this.objects[objectId].x = x;
+                    this.objects[objectId].y = y;
+                    this.saveObjects();
+                }
+            }
+
+            clearAllObjects() {
+                this.objects = {};
+                this.saveObjects();
+                this.renderObjects();
+            }
+
+            saveObjects() {
+                localStorage.setItem('multiplayerObjects', JSON.stringify(this.objects));
+            }
+
+            loadObjects() {
+                const saved = localStorage.getItem('multiplayerObjects');
+                if (saved) {
+                    this.objects = JSON.parse(saved);
+                }
+                
+                // If no objects, create some initial ones
+                if (Object.keys(this.objects).length === 0) {
+                    this.createInitialObjects();
+                }
+            }
+
+            createInitialObjects() {
+                const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
+                for (let i = 0; i < 4; i++) {
+                    const objectId = 'obj_' + i;
+                    this.objects[objectId] = {
+                        id: objectId,
+                        x: Math.random() * 70 + 15,
+                        y: Math.random() * 70 + 15,
+                        color: colors[i],
+                        text: String(i + 1)
+                    };
+                }
+                this.saveObjects();
+            }
+
+            renderObjects() {
+                const canvas = document.getElementById('canvas');
+                // Remove existing objects
+                const existingObjects = document.querySelectorAll('.draggable');
+                existingObjects.forEach(obj => obj.remove());
+                
+                // Create new objects
+                Object.values(this.objects).forEach(obj => {
+                    const element = document.createElement('div');
+                    element.className = 'draggable';
+                    element.id = obj.id;
+                    element.style.left = obj.x + '%';
+                    element.style.top = obj.y + '%';
+                    element.style.backgroundColor = obj.color;
+                    element.textContent = obj.text;
+                    
+                    this.makeDraggable(element);
+                    canvas.appendChild(element);
+                });
+            }
+
+            makeDraggable(element) {
+                let isDragging = false;
+                let startX, startY, initialX, initialY;
+                
+                const startDrag = (clientX, clientY) => {
+                    isDragging = true;
+                    const rect = element.getBoundingClientRect();
+                    const canvasRect = document.getElementById('canvas').getBoundingClientRect();
+                    
+                    startX = clientX - canvasRect.left;
+                    startY = clientY - canvasRect.top;
+                    initialX = parseFloat(element.style.left) || 0;
+                    initialY = parseFloat(element.style.top) || 0;
+                    
+                    element.style.zIndex = '1000';
+                    document.addEventListener('mousemove', drag);
+                    document.addEventListener('touchmove', dragTouch, { passive: false });
+                    document.addEventListener('mouseup', stopDrag);
+                    document.addEventListener('touchend', stopDrag);
+                };
+                
+                const drag = (e) => {
+                    if (!isDragging) return;
+                    e.preventDefault();
+                    
+                    const canvasRect = document.getElementById('canvas').getBoundingClientRect();
+                    const x = e.clientX - canvasRect.left;
+                    const y = e.clientY - canvasRect.top;
+                    
+                    updatePosition(x, y);
+                };
+                
+                const dragTouch = (e) => {
+                    if (!isDragging) return;
+                    e.preventDefault();
+                    
+                    const canvasRect = document.getElementById('canvas').getBoundingClientRect();
+                    const touch = e.touches[0];
+                    const x = touch.clientX - canvasRect.left;
+                    const y = touch.clientY - canvasRect.top;
+                    
+                    updatePosition(x, y);
+                };
+                
+                const updatePosition = (x, y) => {
+                    const deltaX = x - startX;
+                    const deltaY = y - startY;
+                    
+                    const canvasWidth = document.getElementById('canvas').offsetWidth;
+                    const canvasHeight = document.getElementById('canvas').offsetHeight;
+                    
+                    let newX = (initialX + (deltaX / canvasWidth) * 100);
+                    let newY = (initialY + (deltaY / canvasHeight) * 100);
+                    
+                    // Boundary checking
+                    newX = Math.max(0, Math.min(95, newX));
+                    newY = Math.max(0, Math.min(95, newY));
+                    
+                    element.style.left = newX + '%';
+                    element.style.top = newY + '%';
+                    
+                    this.updateObjectPosition(element.id, newX, newY);
+                };
+                
+                const stopDrag = () => {
+                    isDragging = false;
+                    element.style.zIndex = '1';
+                    document.removeEventListener('mousemove', drag);
+                    document.removeEventListener('touchmove', dragTouch);
+                    document.removeEventListener('mouseup', stopDrag);
+                    document.removeEventListener('touchend', stopDrag);
+                };
+                
+                // Mouse events
+                element.addEventListener('mousedown', (e) => {
+                    startDrag(e.clientX, e.clientY);
+                });
+                
+                // Touch events
+                element.addEventListener('touchstart', (e) => {
+                    if (e.touches.length === 1) {
+                        startDrag(e.touches[0].clientX, e.touches[0].clientY);
+                    }
+                });
+            }
+
+            updateUserDisplay() {
+                const userColorDisplay = document.getElementById('userColorDisplay');
+                userColorDisplay.textContent = this.localUser.color;
+                userColorDisplay.style.color = this.localUser.color;
+            }
+
+            changeUserColor() {
+                this.localUser.color = this.generateRandomColor();
+                this.updateUserDisplay();
+            }
+        }
+
+        // Initialize the app
+        const multiplayer = new LocalMultiplayer();
+
+        // DOM event handlers
+        document.getElementById('addObjectBtn').addEventListener('click', () => {
+            const x = Math.random() * 70 + 15;
+            const y = Math.random() * 70 + 15;
+            multiplayer.addObject(x, y);
+        });
+
+        document.getElementById('clearAllBtn').addEventListener('click', () => {
+            if (confirm('Clear all objects?')) {
+                multiplayer.clearAllObjects();
+            }
+        });
+
+        document.getElementById('changeColorBtn').addEventListener('click', () => {
+            multiplayer.changeUserColor();
+        });
+
+        // Handle resize to maintain proper layout
+        window.addEventListener('resize', () => {
+            multiplayer.renderObjects();
+        });
+
+        // Prevent page zoom on double-tap
+        document.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+        });
+
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+    </script>
+</body>
+</html>
